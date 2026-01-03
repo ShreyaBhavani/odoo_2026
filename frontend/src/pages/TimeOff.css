@@ -1,0 +1,10 @@
+.timeoff-container{display:flex;gap:20px}
+.timeoff-form{width:320px;padding:16px;border:1px solid #e6e6e6;border-radius:8px}
+.timeoff-form label{display:block;margin-bottom:8px;font-size:13px}
+.timeoff-form input,.timeoff-form select,.timeoff-form textarea{width:100%;padding:8px;margin-top:4px;border:1px solid #ddd;border-radius:4px}
+.timeoff-form button{margin-top:8px;padding:8px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px}
+.timeoff-list{flex:1;padding:8px}
+.timeoff-item{border:1px solid #eee;padding:12px;margin-bottom:8px;border-radius:6px;display:flex;justify-content:space-between}
+.timeoff-item .left{max-width:75%}
+.timeoff-item .actions button{margin-left:6px;padding:6px 10px}
+.empty{color:#888}

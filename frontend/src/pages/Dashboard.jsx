@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { attendanceAPI, employeeAPI } from "../services/api";
+import TimeOff from './TimeOff';
 import "./Dashboard.css";
 
 const Dashboard = () => {
@@ -149,6 +150,12 @@ const Dashboard = () => {
         >
           Attendance & Time Off
         </button>
+        <button
+          className={activeTab === "timeoff" ? "active" : ""}
+          onClick={() => setActiveTab("timeoff")}
+        >
+          Time Off
+        </button>
         {user?.role === "admin" && (
           <button
             className={activeTab === "settings" ? "active" : ""}
@@ -211,7 +218,7 @@ const Dashboard = () => {
                         className="checkout-btn"
                         onClick={() => handleCheckOut(employee._id)}
                       >
-                        Check Out ->
+                        Check Out →
                       </button>
                     ) : (
                       <button
@@ -304,6 +311,11 @@ const Dashboard = () => {
                 )}
               </div>
             )}
+          </div>
+        )}
+        {activeTab === 'timeoff' && (
+          <div style={{padding:20}}>
+            <TimeOff isAdmin={user?.role === 'admin'} />
           </div>
         )}
       </main>

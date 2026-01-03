@@ -12,6 +12,8 @@ const EmployeeProfile = () => {
   const [salary, setSalary] = useState(null);
   const [attendance, setAttendance] = useState([]);
   const [activeTab, setActiveTab] = useState('resume');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +43,20 @@ const EmployeeProfile = () => {
     }
   };
 
+  useEffect(() => {
+    if (employee) {
+      setEditData({
+        name: employee.name,
+        mobile: employee.mobile || '',
+        company: employee.company || '',
+        department: employee.department || '',
+        manager: employee.manager || '',
+        about: employee.about || '',
+        avatar: employee.avatar || ''
+      });
+    }
+  }, [employee]);
+
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -48,6 +64,28 @@ const EmployeeProfile = () => {
   if (!employee) {
     return <div className="error">Employee not found</div>;
   }
+
+  const isOwner = user?.employeeId?._id === employee._id || user?.employeeId === employee._id || user?.role === 'admin';
+
+  // Ensure editing is disabled for non-owners (in case role changes)
+  useEffect(() => {
+    if (!isOwner && isEditing) setIsEditing(false);
+  }, [isOwner, isEditing]);
+
+  const handleEditToggle = () => {
+    setIsEditing(!isEditing);
+  };
+
+  const handleSave = async () => {
+    try {
+      const resp = await employeeAPI.update(employee._id, editData);
+      setEmployee(resp.data.data);
+      setIsEditing(false);
+      alert('Profile updated');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update');
+    }
+  };
 
   return (
     <div className="profile-page">
@@ -101,8 +139,22 @@ const EmployeeProfile = () => {
         </div>
 
         <div className="profile-content">
+          {!isOwner && (
+            <div className="readonly-banner">
+              You are viewing this profile in read-only mode. Only the profile owner or Admin can edit.
+            </div>
+          )}
           {activeTab === 'resume' && (
             <div className="tab-content">
+              <div className="profile-actions">
+                {isOwner && (
+                  <>
+                    <button className="edit-btn" onClick={handleEditToggle}>{isEditing ? 'Cancel' : 'Edit Profile'}</button>
+                    {isEditing && <button className="save-btn" onClick={handleSave}>Save</button>}
+                  </>
+                )}
+              </div>
+
               <h3>My Name</h3>
               <div className="info-grid">
                 <div className="info-item">
@@ -111,7 +163,11 @@ const EmployeeProfile = () => {
                 </div>
                 <div className="info-item">
                   <label>Company</label>
-                  <p>{employee.company || 'N/A'}</p>
+                  {isEditing ? (
+                    <input value={editData.company} onChange={(e) => setEditData({ ...editData, company: e.target.value })} />
+                  ) : (
+                    <p>{employee.company || 'N/A'}</p>
+                  )}
                 </div>
                 <div className="info-item">
                   <label>Email</label>
@@ -119,27 +175,47 @@ const EmployeeProfile = () => {
                 </div>
                 <div className="info-item">
                   <label>Department</label>
-                  <p>{employee.department || 'N/A'}</p>
+                  {isEditing ? (
+                    <input value={editData.department} onChange={(e) => setEditData({ ...editData, department: e.target.value })} />
+                  ) : (
+                    <p>{employee.department || 'N/A'}</p>
+                  )}
                 </div>
                 <div className="info-item">
                   <label>Mobile</label>
-                  <p>{employee.mobile || 'N/A'}</p>
+                  {isEditing ? (
+                    <input value={editData.mobile} onChange={(e) => setEditData({ ...editData, mobile: e.target.value })} />
+                  ) : (
+                    <p>{employee.mobile || 'N/A'}</p>
+                  )}
                 </div>
                 <div className="info-item">
                   <label>Manager</label>
-                  <p>{employee.manager || 'N/A'}</p>
+                  {isEditing ? (
+                    <input value={editData.manager} onChange={(e) => setEditData({ ...editData, manager: e.target.value })} />
+                  ) : (
+                    <p>{employee.manager || 'N/A'}</p>
+                  )}
                 </div>
               </div>
 
               <h3>About</h3>
-              <p>{employee.about || 'No information provided'}</p>
+              {isEditing ? (
+                <textarea value={editData.about} onChange={(e) => setEditData({ ...editData, about: e.target.value })} />
+              ) : (
+                <p>{employee.about || 'No information provided'}</p>
+              )}
 
               <h3>Skills</h3>
-              <div className="tags">
-                {employee.skills?.map((skill, idx) => (
-                  <span key={idx} className="tag">{skill}</span>
-                )) || <p>No skills listed</p>}
-              </div>
+              {isEditing ? (
+                <input value={(editData.skills || []).join(', ')} onChange={(e) => setEditData({ ...editData, skills: e.target.value.split(',').map(s => s.trim()) })} />
+              ) : (
+                <div className="tags">
+                  {employee.skills?.map((skill, idx) => (
+                    <span key={idx} className="tag">{skill}</span>
+                  )) || <p>No skills listed</p>}
+                </div>
+              )}
 
               <h3>Book Details</h3>
               <div className="info-grid">

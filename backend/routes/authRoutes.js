@@ -1,11 +1,12 @@
 const express = require('express');
 const { body } = require('express-validator');
 const { register, login, getMe } = require('../controllers/authController');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validator');
 
 const router = express.Router();
 
+// Registration: allow public sign-up but admin role requires a valid admin signup code
 router.post(
   '/register',
   [

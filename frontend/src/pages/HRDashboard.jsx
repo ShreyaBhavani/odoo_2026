@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { employeeAPI, salaryAPI, attendanceAPI } from '../services/api';
 import './HRDashboard.css';
+import TimeOff from './TimeOff';
 
 const HRDashboard = () => {
   const [activeTab, setActiveTab] = useState('employees');
@@ -10,6 +11,8 @@ const HRDashboard = () => {
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedEmployeeSalary, setSelectedEmployeeSalary] = useState(null);
+  const [editingSalary, setEditingSalary] = useState(false);
+  const [salaryForm, setSalaryForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [attendance, setAttendance] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
@@ -43,12 +46,39 @@ const HRDashboard = () => {
     }
   };
 
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', email: '', mobile: '', department: '', manager: '', joiningYear: new Date().getFullYear(), role: 'employee' });
+  const [creating, setCreating] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState(null);
+
+  const openCreate = () => { setShowCreate(true); setCreatedCreds(null); };
+  const closeCreate = () => { setShowCreate(false); setCreateForm({ name: '', email: '', mobile: '', department: '', manager: '', joiningYear: new Date().getFullYear(), role: 'employee' }); };
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      const payload = { ...createForm };
+      const res = await employeeAPI.create(payload);
+      const data = res.data.data;
+      // API returns { employee, user: { loginId, password } }
+      setCreatedCreds(data.user || null);
+      // refresh list
+      await fetchEmployees();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Create failed');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleSelectEmployee = async (employee) => {
     setSelectedEmployee(employee);
     setActiveProfileTab('resume');
     try {
       const salaryResponse = await salaryAPI.get(employee._id);
       setSelectedEmployeeSalary(salaryResponse.data.data);
+      setSalaryForm(salaryResponse.data.data);
     } catch (err) {
       setSelectedEmployeeSalary(null);
     }
@@ -112,7 +142,7 @@ const HRDashboard = () => {
     return <div className="loading">Loading...</div>;
   }
 
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.role !== 'hr')) {
     return <div className="error">Access Denied. Admin only.</div>;
   }
 
@@ -148,6 +178,12 @@ const HRDashboard = () => {
           onClick={() => setActiveTab('attendance')}
         >
           Attendance
+        </button>
+        <button
+          className={activeTab === 'timeoff' ? 'active' : ''}
+          onClick={() => setActiveTab('timeoff')}
+        >
+          Time Off
         </button>
       </div>
 
@@ -198,7 +234,10 @@ const HRDashboard = () => {
 
           <main className="hr-main">
             <div className="main-header">
-              <h3>Employees</h3>
+                <h3>Employees</h3>
+                <div style={{marginLeft: 'auto'}}>
+                  <button className="new-button" onClick={openCreate}>+ NEW</button>
+                </div>
             </div>
 
             <div className="employee-list">
@@ -282,43 +321,77 @@ const HRDashboard = () => {
                           <div className="salary-summary">
                             <div className="salary-item">
                               <label>Month Wage</label>
-                              <p className="wage">₹{selectedEmployeeSalary.monthlyWage?.toLocaleString()}</p>
+                              {editingSalary ? (
+                                <input type="number" value={salaryForm.monthlyWage} onChange={e=>{
+                                  const m = Number(e.target.value||0);
+                                  setSalaryForm(sf=> ({...sf, monthlyWage: m, yearlyWage: m*12}));
+                                }} />
+                              ) : (
+                                <p className="wage">₹{selectedEmployeeSalary.monthlyWage?.toLocaleString()}</p>
+                              )}
                               <span>/ Month</span>
                             </div>
                             <div className="salary-item">
                               <label>Yearly wage</label>
-                              <p className="wage">₹{selectedEmployeeSalary.yearlyWage?.toLocaleString()}</p>
+                              <p className="wage">₹{(editingSalary ? salaryForm.yearlyWage : selectedEmployeeSalary.yearlyWage)?.toLocaleString()}</p>
                               <span>/ Year</span>
                             </div>
                             <div className="salary-item">
                               <label>No of working days</label>
                               <p className="wage">in a week:</p>
-                              <span>{selectedEmployeeSalary.workingDaysPerWeek}</span>
+                              <span>{editingSalary ? salaryForm.workingDaysPerWeek : selectedEmployeeSalary.workingDaysPerWeek}</span>
                             </div>
                           </div>
 
                           <h5>Salary Components</h5>
                           <div className="salary-components">
-                            {Object.entries(selectedEmployeeSalary.components || {}).map(([key, value]) => (
-                              <div key={key} className="component-row">
-                                <span className="component-name">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                <span className="component-amount">₹{value.amount?.toLocaleString() || 0}</span>
-                                <span className="component-percentage">{value.percentage || 0}%</span>
-                              </div>
-                            ))}
+                            {(editingSalary ? Object.entries(salaryForm.components || {}) : Object.entries(selectedEmployeeSalary.components || {})).map(([key, value]) => {
+                              const displayName = key.replace(/([A-Z])/g, ' $1').trim();
+                              const perc = value?.percentage || 0;
+                              const amount = value?.amount || 0;
+                              return (
+                                <div key={key} className="component-row">
+                                  <span className="component-name">{displayName}</span>
+                                  {editingSalary ? (
+                                    <input type="number" value={perc} onChange={e=>{
+                                      const p = Number(e.target.value||0);
+                                      setSalaryForm(sf=>{
+                                        const components = {...sf.components};
+                                        components[key] = components[key] || {};
+                                        components[key].percentage = p;
+                                        components[key].amount = Math.round((sf.monthlyWage || 0) * (p/100));
+                                        return {...sf, components};
+                                      });
+                                    }} />
+                                  ) : (
+                                    <span className="component-amount">₹{amount?.toLocaleString() || 0}</span>
+                                  )}
+                                  <span className="component-percentage">{perc}%</span>
+                                </div>
+                              );
+                            })}
                           </div>
 
-                          <h5>Provident Fund (PF) Contribution</h5>
-                          <div className="pf-section">
-                            <div className="pf-row">
-                              <span>Employee Contribution</span>
-                              <span>₹{selectedEmployeeSalary.providentFund?.employee?.toLocaleString() || 0}</span>
+                          {!editingSalary ? (
+                            <div style={{marginTop:12}}>
+                              <button onClick={()=>{ setEditingSalary(true); setSalaryForm(selectedEmployeeSalary); }}>Edit Salary</button>
                             </div>
-                            <div className="pf-row">
-                              <span>Employer Contribution</span>
-                              <span>₹{selectedEmployeeSalary.providentFund?.employer?.toLocaleString() || 0}</span>
+                          ) : (
+                            <div style={{marginTop:12}}>
+                              <button onClick={async ()=>{
+                                const total = Object.values(salaryForm.components || {}).reduce((s,c)=>s + (c.percentage || 0),0);
+                                if(total > 100) { alert('Total component percentages exceed 100%'); return; }
+                                try {
+                                  const payload = {...salaryForm, employeeId: selectedEmployee._id};
+                                  await salaryAPI.createOrUpdate(payload);
+                                  const resp = await salaryAPI.get(selectedEmployee._id);
+                                  setSelectedEmployeeSalary(resp.data.data);
+                                  setEditingSalary(false);
+                                } catch (e) { alert(e.response?.data?.message || 'Save failed'); }
+                              }}>Save</button>
+                              <button onClick={()=>{ setEditingSalary(false); setSalaryForm(selectedEmployeeSalary); }}>Cancel</button>
                             </div>
-                          </div>
+                          )}
                         </>
                       ) : (
                         <p>No salary information available</p>
@@ -345,6 +418,45 @@ const HRDashboard = () => {
               </>
             )}
           </aside>
+        </div>
+      )}
+
+      {showCreate && (
+        <div className="modal-backdrop" style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000}}>
+          <div style={{background:'#fff',padding:20,borderRadius:8,width:640,maxWidth:'95%'}}>
+            <h3>Create Employee</h3>
+            {!createdCreds ? (
+              <form onSubmit={handleCreate}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                  <input required placeholder="Full name" value={createForm.name} onChange={e=>setCreateForm({...createForm,name:e.target.value})} />
+                  <input required type="email" placeholder="Email" value={createForm.email} onChange={e=>setCreateForm({...createForm,email:e.target.value})} />
+                  <input placeholder="Mobile" value={createForm.mobile} onChange={e=>setCreateForm({...createForm,mobile:e.target.value})} />
+                  <input placeholder="Department" value={createForm.department} onChange={e=>setCreateForm({...createForm,department:e.target.value})} />
+                  <input placeholder="Manager" value={createForm.manager} onChange={e=>setCreateForm({...createForm,manager:e.target.value})} />
+                  <input type="number" placeholder="Joining Year" value={createForm.joiningYear} onChange={e=>setCreateForm({...createForm,joiningYear:parseInt(e.target.value||new Date().getFullYear())})} />
+                </div>
+                <div style={{marginTop:12,display:'flex',gap:8,justifyContent:'flex-end'}}>
+                  <button type="button" onClick={closeCreate}>Cancel</button>
+                  <button type="submit" disabled={creating}>{creating? 'Creating...' : 'Create'}</button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <p>Employee created.</p>
+                <p><strong>Login ID:</strong> {createdCreds.loginId}</p>
+                <p><strong>Temporary Password:</strong> {createdCreds.password}</p>
+                <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}}>
+                  <button onClick={()=>{ navigator.clipboard?.writeText(`Login ID: ${createdCreds.loginId}\nPassword: ${createdCreds.password}`); alert('Copied'); }}>Copy</button>
+                  <button onClick={()=>{ setCreatedCreds(null); closeCreate(); }}>Close</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {activeTab === 'timeoff' && (
+        <div style={{ padding: 20 }}>
+          <TimeOff isAdmin={true} />
         </div>
       )}
 

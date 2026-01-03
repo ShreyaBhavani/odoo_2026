@@ -25,6 +25,15 @@ export const authAPI = {
   getMe: () => api.get('/auth/me')
 };
 
+// TimeOff API
+export const timeOffAPI = {
+  create: (data) => api.post('/timeoff', data),
+  getMine: () => api.get('/timeoff/mine'),
+  getAll: () => api.get('/timeoff') ,
+  approve: (id) => api.put(`/timeoff/${id}/approve`),
+  reject: (id) => api.put(`/timeoff/${id}/reject`)
+};
+
 // Employee API
 export const employeeAPI = {
   getAll: () => api.get('/employees'),

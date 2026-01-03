@@ -22,12 +22,12 @@ const ProtectedRoute = ({ children, adminOnly = false, employeeOnly = false }) =
     return <Navigate to="/login" replace />;
   }
 
-  // If adminOnly is set, only allow admin users
-  if (adminOnly && user.role !== 'admin') {
+  // If adminOnly is set, allow 'admin' and 'hr' roles (HR has admin-like access)
+  if (adminOnly && user.role !== 'admin' && user.role !== 'hr') {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // If employeeOnly is set, only allow employee users
+  // If employeeOnly is set, only allow employees; non-employees go to HR/Admin dashboard
   if (employeeOnly && user.role !== 'employee') {
     return <Navigate to="/hr-dashboard" replace />;
   }

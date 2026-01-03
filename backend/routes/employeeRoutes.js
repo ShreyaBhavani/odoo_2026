@@ -6,7 +6,7 @@ const {
   updateEmployee,
   deleteEmployee
 } = require('../controllers/employeeController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize, ownerOrAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ router.route('/')
 
 router.route('/:id')
   .get(protect, getEmployee)
-  .put(protect, updateEmployee)
+  .put(protect, ownerOrAdmin(), updateEmployee)
   .delete(protect, authorize('admin'), deleteEmployee);
 
 module.exports = router;

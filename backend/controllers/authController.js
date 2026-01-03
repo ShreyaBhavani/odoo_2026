@@ -3,9 +3,8 @@ const Employee = require('../models/Employee');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE
-  });
+  const expiresIn = process.env.JWT_EXPIRE || '7d';
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn });
 };
 
 // @desc    Register user
@@ -13,7 +12,7 @@ const generateToken = (id) => {
 // @access  Public
 exports.register = async (req, res) => {
   try {
-    const { loginId, email, password, role, employeeName } = req.body;
+    const { loginId, email, password, role, employeeName, adminCode } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ $or: [{ email }, { loginId }] });
@@ -21,22 +20,39 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Create employee if registering as employee
-    let employeeId = null;
-    if (role === 'employee' && employeeName) {
-      const employee = await Employee.create({
-        name: employeeName,
-        email: email
-      });
-      employeeId = employee._id;
+    // Only allow HR or Admin to register via public signup.
+    // Employees must be created by HR/Admin internally — no self-signup.
+    if (!role || role === 'employee') {
+      return res.status(403).json({ message: 'Employee self-signup is not allowed. Please contact HR or Admin.' });
     }
+
+    // Validate role: allow 'hr' or 'admin'
+    let assignedRole = null;
+    if (role === 'hr') {
+      assignedRole = 'hr';
+    } else if (role === 'admin') {
+      const adminSignupCode = process.env.ADMIN_SIGNUP_CODE;
+      if (!adminSignupCode) {
+        return res.status(403).json({ message: 'Admin signup is disabled on this server' });
+      }
+      if (adminCode !== adminSignupCode) {
+        return res.status(403).json({ message: 'Invalid admin signup code' });
+      }
+      assignedRole = 'admin';
+    } else {
+      return res.status(403).json({ message: 'Invalid signup role' });
+    }
+
+    // Only create Employee documents for 'employee' role. Since self-signup for employees
+    // is disabled, we do not create employee records here for hr/admin signups.
+    let employeeId = null;
 
     // Create user
     const user = await User.create({
       loginId,
       email,
       password,
-      role: role || 'employee',
+      role: assignedRole,
       employeeId
     });
 
@@ -69,16 +85,19 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { loginId, password } = req.body;
+    console.log('Login attempt for:', loginId);
 
     // Check for user
     const user = await User.findOne({ loginId }).populate('employeeId');
     if (!user) {
+      console.log('User not found for loginId:', loginId);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.log('Password mismatch for:', loginId);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 

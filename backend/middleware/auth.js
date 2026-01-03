@@ -36,3 +36,18 @@ exports.authorize = (...roles) => {
     next();
   };
 };
+
+// Allow access if user is admin OR the owner of the employee record
+exports.ownerOrAdmin = () => {
+  return (req, res, next) => {
+    try {
+      if (!req.user) return res.status(401).json({ message: 'Not authorized' });
+      if (req.user.role === 'admin') return next();
+      const empId = req.user.employeeId ? req.user.employeeId.toString() : null;
+      if (empId && empId === req.params.id) return next();
+      return res.status(403).json({ message: 'User not authorized to perform this action' });
+    } catch (err) {
+      return res.status(403).json({ message: 'User not authorized to perform this action' });
+    }
+  };
+};

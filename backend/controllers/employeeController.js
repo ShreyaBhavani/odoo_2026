@@ -27,13 +27,61 @@ exports.getEmployee = async (req, res) => {
   }
 };
 
-// @desc    Create employee
+// @desc    Create employee + user (by Admin/HR)
 // @route   POST /api/employees
 // @access  Private/Admin
 exports.createEmployee = async (req, res) => {
   try {
-    const employee = await Employee.create(req.body);
-    res.status(201).json({ success: true, data: employee });
+    const {
+      name,
+      email,
+      mobile,
+      company,
+      department,
+      manager,
+      avatar,
+      about,
+      skills,
+      status,
+      isPresent,
+      role,
+      joiningYear
+    } = req.body;
+
+    const employee = await Employee.create({
+      name,
+      email,
+      mobile,
+      company,
+      department,
+      manager,
+      avatar,
+      about,
+      skills,
+      status,
+      isPresent
+    });
+
+    // Create a linked User with generated loginId and random password
+    const { generateLoginId } = require('../utils/idGenerator');
+    const loginId = await generateLoginId(name, joiningYear || new Date().getFullYear());
+
+    // generate a temporary random password (8 chars)
+    const crypto = require('crypto');
+    const plainPassword = crypto.randomBytes(4).toString('hex');
+
+    const User = require('../models/User');
+    const user = await User.create({
+      loginId,
+      email,
+      password: plainPassword,
+      role: role || 'employee',
+      employeeId: employee._id
+    });
+
+    await Employee.findByIdAndUpdate(employee._id, { userId: user._id });
+
+    res.status(201).json({ success: true, data: { employee, user: { loginId: user.loginId, password: plainPassword } } });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -44,9 +92,22 @@ exports.createEmployee = async (req, res) => {
 // @access  Private
 exports.updateEmployee = async (req, res) => {
   try {
+    // Only allow certain fields for non-admin users
+    const user = req.user; // set by protect middleware
+    let updatePayload = {};
+    if (user && user.role === 'admin') {
+      updatePayload = req.body;
+    } else {
+      // allow limited editable fields for employees themselves
+      const allowed = ['mobile', 'company', 'department', 'manager', 'about', 'avatar', 'skills', 'privateInfo', 'resume'];
+      allowed.forEach((key) => {
+        if (req.body[key] !== undefined) updatePayload[key] = req.body[key];
+      });
+    }
+
     const employee = await Employee.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updatePayload,
       { new: true, runValidators: true }
     );
     
