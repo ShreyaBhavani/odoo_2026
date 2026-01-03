@@ -1,7 +1,6 @@
-<<<<<<< HEAD
 # odoo_2026
-=======
-# Employee Management System
+
+# Dayflow Human Resource Management System
 
 A full-stack employee management application with React frontend and Node.js/Express backend following MVC architecture.
 
@@ -188,8 +187,3 @@ The frontend uses React with component-based architecture:
 - **Components**: Reusable UI components
 - **Context**: Global state management (Auth)
 - **Services**: API communication layer
-
-## License
-
-MIT
->>>>>>> dev
